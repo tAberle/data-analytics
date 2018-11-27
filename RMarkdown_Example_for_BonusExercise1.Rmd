@@ -1,0 +1,115 @@
+---
+output:
+  html_document: default
+  pdf_document:
+    latex_engine: lualatex
+---
+<style type="text/css">
+h2 {
+border-left: 10px solid #3f75b3;
+padding: 5px 5px 5px 10px;
+background-color: #efefef;
+}
+</style>
+---
+title: "EESYS-DAE-M: Semester assignment 1"
+subtitle: "Example solution"
+author: Sebastian Günther
+output: 
+  html_document:
+    theme: spacelab
+    highlight: haddock
+---
+```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir = '~/Downloads/')
+library(dplyr)
+```
+# Example: Research Question from Tutorial
+## Question to answer
+*Does the attitude towards the environment (i.e., a higher score on environmentalism) translate into higher saving effects? (we assume it does)*
+
+## Hypotheses
+**H0**: Giving weight to environmentalism does not translate into stronger saving effects.
+
+**H1**: Giving weight to environmentalism translates to stronger saving effects.
+
+## Solution
+
+1. Load Shower and Survey Data set
+2. Transform the questions into numeric values. Calculate an environmentally friendly score per individual.
+3. Calculate the average consumption during baseline and intervention phase per individual of the treatment group
+4. Calculate savings for every individual (baseline - intervention)
+5. Link the savings to the environmental score
+6. Split the savings into two groups. Individuals with a low and a high environmentally friendly score.
+7. Compare (one-sided t-test) means of savings of both groups.
+
+
+```{r}
+library(dplyr)
+#Read the data
+Shower_data <- read.csv2("~/Downloads/Shower_data.csv")
+Survey_data <- read.csv2("~/Downloads/Shower_survey_data.csv")
+
+transformValues <- function(x){
+  x <- as.character(x)
+  x <- ifelse(x=="Stimme nicht zu", -2, x)
+  x <- ifelse(x=="Stimme eher nicht zu", -1, x)
+  x <- ifelse(x=="Indifferent", 0, x)
+  x <- ifelse(x=="Stimme eher zu", 1, x)
+  x <- ifelse(x=="Stimme zu", 2, x)
+  return(as.numeric(x))
+}
+
+Survey_data <- Survey_data  %>% dplyr::mutate_at(vars(starts_with("att")), funs(transformValues))
+
+#Combine all the environmentalism scores into one (Note att1 and att8 are negative because the scale is flipped)
+Survey_data <- Survey_data %>% dplyr::mutate(environmentalism = -att1+att2+att3+att4+att5+att6+att7-att8+att9+att10)
+
+#Drop first shower
+Shower_data <- Shower_data %>% dplyr::filter(Shower != 1) %>%
+  dplyr::mutate(isTreatment = ifelse(group %in% c("1","2"), FALSE, TRUE),
+                isIntervention = ifelse(Shower <= 10, FALSE, TRUE))
+
+### Way1
+#Calculate the water consumption for each phase and each group
+treatmentShowers <- Shower_data %>% dplyr::filter(isTreatment) 
+
+treatmentShowersBaseline <- treatmentShowers %>% dplyr::filter(!isIntervention) %>%
+  dplyr::group_by(Hh_ID) %>%
+  dplyr::summarise(baselineConsumption = mean(Volume))
+
+treatmentShowersIntervention <- treatmentShowers %>% dplyr::filter(isIntervention) %>%
+  dplyr::group_by(Hh_ID) %>%
+  dplyr::summarise(interventionConsumption = mean(Volume))
+
+#"Connect" both phases, introduce "savings"
+consumptionPerPhase <- dplyr::inner_join(treatmentShowersBaseline, 
+                                         treatmentShowersIntervention,
+                                         by = "Hh_ID")
+
+#Calculate the savings (simple approach, neglecting the control group, but ok for now)
+VolumeSavings <- consumptionPerPhase %>% dplyr::mutate(savings = baselineConsumption - interventionConsumption)
+
+#Join savings with survey data
+VolumeSavingsEnriched <- dplyr::left_join(VolumeSavings, Survey_data, by = "Hh_ID")
+
+#Create the group for the environmentally friendly people
+VolumeSavingsEnrichedMedian <- VolumeSavingsEnriched %>% dplyr::mutate(environmentally_friendly = 
+                                                                         environmentalism > median(Survey_data$environmentalism, na.rm = TRUE))
+
+VolumeSavingsEnrichedMedian %>% dplyr::group_by(environmentally_friendly) %>%
+  dplyr::summarise(meanSavings = mean(savings),
+                   sdSavings = sd(savings))
+
+
+# those who are environmentally friendly save less (according to the sample mean) than
+# those who are not environmentally friendly. Strange at first sight.
+# Apply the t-test - the result of the t-test is not surprising given the means
+t.test(VolumeSavingsEnrichedMedian %>% dplyr::filter(environmentally_friendly) %>% dplyr::pull(savings),
+       VolumeSavingsEnrichedMedian %>% dplyr::filter(!environmentally_friendly) %>% dplyr::pull(savings), 
+       alternative="greater")
+```
+## Result
+**We fail to reject H0.**  
+
+The t-tests suggests that people who are environmentally friendly use as much water than those who are not environmentally friendly.
