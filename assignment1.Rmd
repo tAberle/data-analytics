@@ -1,0 +1,142 @@
+---
+title: "Assignment 1"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggcorrplot)
+
+shower_data <- read.csv2("shower_data.csv")
+survey_data <- read.csv2("shower_survey_data.csv")
+```
+
+## Exercise a)
+
+Does real-time information on personal water consumption
+trigger conservation behavior? You may normalize the savings
+using the control group.
+
+H<sub>0</sub> = Real-time information does not trigger conservation behaviour.
+H<sub>1</sub> = Real-time information does trigger conservation behaviour.
+
+```{r}
+baseline_showers <- shower_data %>% filter(Shower < 10) %>% group_by(group) %>% summarise(avgVolume = mean(Volume))
+intervention_showers <- shower_data %>% filter(Shower >= 10) %>% group_by(group) %>% summarise(avgVolume = mean(Volume))
+
+joined_showers <- baseline_showers %>% inner_join(intervention_showers, by = "group") %>% mutate(difference = avgVolume.y - avgVolume.x)
+
+View(joined_showers)
+```
+Answer: The joined_showers table shows, that the average waterconsumption in the treatment groups (3, 4, 5, 6) decreases in the intervention phase by 3 to 7.5 liters. In the control groups (1, 2) on the other hand the average volume increases slightly.
+
+## Exercise b)
+
+What is the Hawthorne-Effect? Is there some evidence for the
+Hawthorne-Effect in the control group data data? What additional
+information would you need to further support your statement?
+
+H<sub>0</sub> = The control group of the shower dataset is not influenced by the Hawthorn-Effect.
+H<sub>1</sub> = The control group of the shower dataset is influenced by the Hawthorne-Effect.
+
+Answer: The Hawthorne-Effect decribes a phenomenon that can occur during studies with treatment and control groups. When people take part in a study they often change their normal behaviour, knowing that someone is observing them. This leads to situations, where the control groups show a change in behaviour that is similar to the change in the treatment groups, despite the lack of a treatment.
+
+There is no evidence for the Hawthorne-Effect in the shower dataset, since none of the control groups shows a decreasing consumption of water, despite knowing that they are part of a study.
+
+## Exercise c)
+
+It often seems that young people are more aware of the
+environmental impact of their actions than older people and
+therefore may consume fewer resources by default: For this
+reason, check whether the baseline consumption of young
+people (20-29) is statistically significantly different from the
+baseline consumption of older people. Describe the results.
+
+H<sub>0</sub> = Old people tend to save more water than young people.
+H<sub>1</sub> = Young people tend to save more water than old people.
+
+```{r}
+joined_dataset <- inner_join(shower_data, survey_data, by = "Hh_ID")
+baseline_showers_young <- joined_dataset %>% filter(Shower < 10 & alter == "20-29")
+summarised_volume_young <- baseline_showers_young %>% summarise(avgVolume = mean(Volume), medianVolume = median(Volume))
+baseline_showers_old <- joined_dataset %>% filter(Shower < 10 & alter != "20-29")
+summarised_volume_old <- baseline_showers_old %>% summarise(avgVolume = mean(Volume), medianVolume = median(Volume))
+
+difference_avg <- summarised_volume_young$avgVolume - summarised_volume_old$avgVolume
+difference_median <- summarised_volume_young$medianVolume - summarised_volume_old$medianVolume
+```
+
+Answer: The dataset does not support the assumption, that younger people are more aware of the environmental impact on water consumption. The group of young people has a significantly higher average consumption (around 15 liters) and also a higher median consumption (16 liters), than their older counterpart.
+
+## Exercise d)
+
+Does the gender of the participants influence the average shower
+volume of the users during the baseline phase (column "gesl" of
+the survey data)? Subsequently, check the influence of the hair
+length ("x03d_longhair"). Do the results make sense? Give a
+short explanation for the observation.
+
+H<sub>0</sub> = Female participants tend to save more water than male participants, furthermore participants with long hair save more water than participants with short hair.
+H<sub>1</sub> = Male participants tend to save more water than female participants, furthermore participants with short hair save more water than participants with long hair.
+
+```{r}
+baseline_showers_male <- joined_dataset %>% filter(Shower < 10 & gesl != "weiblich")
+baseline_showers_female <- joined_dataset %>% filter(Shower < 10 & gesl == "weiblich")
+
+avg_baseline_male <- baseline_showers_male %>% summarise(avgVolume = mean(Volume))
+avg_baseline_female <- baseline_showers_female %>% summarise(avgVolume = mean(Volume))
+
+View(avg_baseline_male)
+View(avg_baseline_female)
+```
+
+The average consumption of the male participants (~43 liters) is slightly higher than the average consumption of the female participants (~41 liters).
+
+```{r}
+baseline_showers_long_hair <- joined_dataset %>% filter(Shower < 10 & X03d_longhair == 1)
+baseline_showers_short_hair <- joined_dataset %>% filter(Shower < 10 & X03d_longhair == 0)
+
+avg_baseline_long_hair <- baseline_showers_long_hair %>% summarise(avgVolume = mean(Volume))
+avg_baseline_short_hair <- baseline_showers_short_hair %>% summarise(avgVolume = mean(Volume))
+```
+
+However the average consumption of participants whith long hair (~49 liters) is significantly higher than the consumption of participants with short hair (~39 liters). This is due to the fact, that the groups "female" and "long hair" are by no means identical, just like the groups "male" and "short hair".
+
+## Exercise e)
+
+Test whether study participants with a monthly income of 3999
+Swiss francs or less show similar water consumption changes
+(possibly savings) than individuals earning more. Remove
+participants who have not indicated their salary from the test.
+What do you observe?
+
+H<sub>0</sub> = Participants with lower income tend to save more water than participants with higher income.
+H<sub>1</sub> = Participants with higher income tend to save more water than participants with lower income.
+
+```{r}
+dataset_without_missing_values <- joined_dataset %>% filter(einkommen != "Keine Angabe")
+
+avg_low_income <- dataset_without_missing_values %>% filter(einkommen == "< 3000 Fr." | einkommen == "3000 - 3999 Fr.") %>% summarise(avgVolume = mean(Volume))
+avg_high_income <- dataset_without_missing_values %>% filter(einkommen != "< 3000 Fr." & einkommen != "3000 - 3999 Fr.") %>% summarise(avgVolume = mean(Volume))
+```
+
+Answer: Participants with an higher income than 3999Fr tend to consume less water on average (~40 liters) than participants that have a lower income than 3999Fr (~43 liters).
+
+## Exercise f)
+
+Energy consumption can be reduced by reducing the time per
+shower, the flow rate, by lowering the water hot water
+temperature or by stopping the water flow when applying
+shampoo. What seems to be the preferred strategy of the users?
+
+H<sub>0</sub> = There is no dominant strategy to save water.
+H<sub>1</sub> = There is a dominant strategy to save water.
+
+```{r}
+correlation_matrix <- cor(shower_data)
+View(correlation_matrix)
+ggcorrplot(correlation_matrix)
+```
+
+Answer: The water consumption correlates most with the shower time, and only marginally with the average temperature, the flow rate and showerstops. The best strategy to reduce the consumed volume of water seems to be the reduction of the overall showertime.
