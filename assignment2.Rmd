@@ -1,0 +1,72 @@
+---
+title: "Assignment 2"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggcorrplot)
+require(ggplot2)
+
+shower_data <- read.csv2("shower_data.csv")
+survey_data <- read.csv2("shower_survey_data.csv")
+```
+
+## Exercise a)
+
+Before you start to build the model, you need to derive the energy consumption
+from the given parameters and preprocess the data. The energy use [kWh] per
+shower can be estimated using the following formula (neglecting units); we
+assume a cold water temperature of 12 degrees and an average water heating
+efficiency of 65%.
+
+```{r}
+shower_data <- mutate(shower_data, energy = Volume * (Avgtemperature - 12/0.65) * (4.184 / 3600))
+```
+
+## Exercise b)
+
+Remove showers with a negative energy consumption. Moreover,
+identify and remove outliers on the dependent variable, if they exist.
+Justify your choice.
+
+```{r}
+shower_data <- filter(shower_data, energy >= 0)
+
+plot(shower_data$Shower, shower_data$energy)
+
+outliers <- boxplot.stats(shower_data$energy)$out
+
+energy_without_outliers <- shower_data$energy[!shower_data$energy %in% boxplot.stats(shower_data$energy)$out]
+```
+
+## Exercise c)
+
+Estimate the energy savings using a difference-in-difference (DiD)
+model; do not include items from the questionnaire. Then, interpret
+the estimated values of the DiD model. Do the values reflect what one
+would expect from a successful randomization?
+
+```{r}
+baseline <- shower_data %>% filter(Shower < 10)
+intervention <- shower_data %>% filter(Shower >= 10)
+
+baseline_treatment <- baseline %>% filter(group > 2)
+baseline_control <- baseline %>% filter(group <= 2)
+intervention_treatment <- intervention %>% filter(group > 2)
+intervention_control <- intervention %>% filter(group <= 2)
+
+avg_intervention_treatment <- intervention_treatment %>% summarise(avgEnergy = mean(energy))
+avg_intervention_control <- intervention_control %>% summarise(avgEnergy = mean(energy))
+avg_baseline_treatment <- baseline_treatment %>% summarise(avgEnergy = mean(energy))
+avg_baseline_control <- baseline_control %>% summarise(avgEnergy = mean(energy))
+
+# Add dummy variable for intervention phase
+shower_data <- shower_data %>% mutate(intervention = ifelse(Shower < 10, 0, ifelse(Shower >= 10, 1, NA)))
+
+# Add dummy variable for treatment group
+shower_data <- shower_data %>% mutate(treatment = ifelse(group <= 2, 0, ifelse(group > 2, 1, NA)))
+
+model <- lm(energy ~ treatment, shower_data)
+```
