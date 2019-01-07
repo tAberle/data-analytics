@@ -39,6 +39,18 @@ plot(shower_data$Shower, shower_data$energy)
 outliers <- boxplot.stats(shower_data$energy)$out
 
 energy_without_outliers <- shower_data$energy[!shower_data$energy %in% boxplot.stats(shower_data$energy)$out]
+
+####### Winsorizing #######
+#qnt <- quantile(shower_data$energy, probs=c(.25, .75), na.rm = T)
+#caps <- quantile(shower_data$energy, probs=c(.05, .95), na.rm = T)
+#H <- 1.5 * IQR(shower_data$energy, na.rm = T)
+#shower_data$energy[shower_data$energy < (qnt[1] - H)] <- caps[1]
+#shower_data$energy[shower_data$energy > (qnt[2] + H)] <- caps[2]
+
+qnt <- quantile(shower_data$energy, probs=c(.25, .75), na.rm = T)
+H <- 1.5 * IQR(shower_data$energy, na.rm = T)
+shower_data$energy[shower_data$energy < (qnt[1] - H)] <- NA
+shower_data$energy[shower_data$energy > (qnt[2] + H)] <- NA
 ```
 
 ## Exercise c)
@@ -68,5 +80,5 @@ shower_data <- shower_data %>% mutate(intervention = ifelse(Shower < 10, 0, ifel
 # Add dummy variable for treatment group
 shower_data <- shower_data %>% mutate(treatment = ifelse(group <= 2, 0, ifelse(group > 2, 1, NA)))
 
-model <- lm(energy ~ treatment, shower_data)
+model <- lm(energy ~ treatment + intervention + treatment * intervention + Volume, data = shower_data)
 ```
