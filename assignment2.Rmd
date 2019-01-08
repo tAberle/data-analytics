@@ -47,7 +47,7 @@ energy_without_outliers <- shower_data$energy[!shower_data$energy %in% boxplot.s
 #shower_data$energy[shower_data$energy < (qnt[1] - H)] <- caps[1]
 #shower_data$energy[shower_data$energy > (qnt[2] + H)] <- caps[2]
 
-qnt <- quantile(shower_data$energy, probs=c(.25, .75), na.rm = T)
+qnt <- quantile(shower_data$energy, probs=c(.10, .90), na.rm = T)
 H <- 1.5 * IQR(shower_data$energy, na.rm = T)
 shower_data$energy[shower_data$energy < (qnt[1] - H)] <- NA
 shower_data$energy[shower_data$energy > (qnt[2] + H)] <- NA
@@ -80,5 +80,69 @@ shower_data <- shower_data %>% mutate(intervention = ifelse(Shower < 10, 0, ifel
 # Add dummy variable for treatment group
 shower_data <- shower_data %>% mutate(treatment = ifelse(group <= 2, 0, ifelse(group > 2, 1, NA)))
 
-model <- lm(energy ~ treatment + intervention + treatment * intervention + Volume, data = shower_data)
+model <- lm(energy ~ Volume + treatment + intervention + treatment * intervention, data = shower_data)
+```
+
+## Exercise d)
+
+Now extend the basic model by including the following variables as
+interacting variables of your DiD model. Please add each of the
+following variables separately to the basic model
+(i. e., first step: DiD with Baseline, second step: DiD with Age, .).
+- Baseline Consumption
+- Age
+- Long hair (0=no)
+- Environmental attitude (att5: "ich verhalte mich auch dann
+umweltbewusst, wenn es erheblich höhere Kosten und Mühen
+verursacht"; 5 = strong agreement)
+Which variables have a statistically significant influence on the saving
+effects?
+
+```{r}
+joined_data <- inner_join(shower_data, survey_data, by = "Hh_ID")
+sumVolume <- joined_data %>% filter(intervention == 0) %>% group_by(Hh_ID) %>% summarize(baseline_consumption = sum(Volume))
+joined_data <- inner_join(joined_data, sumVolume, by = "Hh_ID")
+
+model1 <- lm(energy ~ Volume + baseline_consumption + treatment + intervention + treatment * intervention, data = joined_data)
+AIC(model1)
+model2 <- lm(energy ~ Volume + alter + treatment + intervention + treatment * intervention, data = joined_data)
+AIC(model2)
+
+joined_data <- joined_data %>% mutate(long_hair = ifelse(X03d_longhair >= 1, "Yes", ifelse(X03d_longhair == 0, "No", NA)))
+model3 <- lm(energy ~ Volume + long_hair + treatment + intervention + treatment * intervention, data = joined_data)
+AIC(model3)
+
+model4 <- lm(energy ~ Volume + att5 + treatment + intervention + treatment * intervention, data = joined_data)
+AIC(model4)
+```
+
+## Exercise e)
+
+```{r}
+model5 <- lm(energy ~ Volume + baseline_consumption + alter + long_hair + att5 + treatment + intervention + treatment * intervention, data = joined_data)
+
+barplot(t(summary(model5)$coefficients), main = "Barplot")
+```
+
+## Exercise f)
+
+```{r}
+# Treatmentgruppe der nicht Umweltbewussten sparten mehr Wasser
+test <- joined_data %>% filter(att5 == "Stimme nicht zu")
+model6 <- lm(energy ~ Volume + treatment + intervention + treatment * intervention, data = test)
+
+test2 <- joined_data %>% filter(att5 == "Stimme zu")
+model7 <- lm(energy ~ Volume + treatment + intervention + treatment * intervention, data = test2)
+
+test3 <- joined_data %>% group_by(Hh_ID) %>% summarize(avg_showertime = mean(Showertime))
+test4 <- inner_join(joined_data, test3)
+test5 <- test4 %>% mutate(clean_people = ifelse(avg_showertime >= mean(test3$avg_showertime), 1, ifelse(avg_showertime < mean(test3$avg_showertime), 0, NA)))
+test6 <- test5 %>% filter(clean_people == 1)
+test7 <- test5 %>% filter(clean_people == 0)
+
+# Langeduscher haben in der Intervention phase kürzer geduscht
+model8 <- lm(energy ~ Volume + avg_showertime + treatment + intervention + treatment * intervention, data = test6)
+model9 <- lm(energy ~ Volume + avg_showertime + treatment + intervention + treatment * intervention, data = test7)
+
+# Einzelperson wird signifikanter. Bei Beibehalten der Randomisierung, kaum Unterschied.
 ```
