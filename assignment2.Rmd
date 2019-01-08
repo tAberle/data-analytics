@@ -22,6 +22,7 @@ assume a cold water temperature of 12 degrees and an average water heating
 efficiency of 65%.
 
 ```{r}
+# create new variable ???energy??? and import it into shower_data
 shower_data <- mutate(shower_data, energy = Volume * (Avgtemperature - 12/0.65) * (4.184 / 3600))
 ```
 
@@ -32,21 +33,11 @@ identify and remove outliers on the dependent variable, if they exist.
 Justify your choice.
 
 ```{r}
+# delete all energy-consumptions which are smaller or equal zero
 shower_data <- filter(shower_data, energy >= 0)
 
-plot(shower_data$Shower, shower_data$energy)
-
-outliers <- boxplot.stats(shower_data$energy)$out
-
-energy_without_outliers <- shower_data$energy[!shower_data$energy %in% boxplot.stats(shower_data$energy)$out]
-
-####### Winsorizing #######
-#qnt <- quantile(shower_data$energy, probs=c(.25, .75), na.rm = T)
-#caps <- quantile(shower_data$energy, probs=c(.05, .95), na.rm = T)
-#H <- 1.5 * IQR(shower_data$energy, na.rm = T)
-#shower_data$energy[shower_data$energy < (qnt[1] - H)] <- caps[1]
-#shower_data$energy[shower_data$energy > (qnt[2] + H)] <- caps[2]
-
+# detect outliers with specifying the Interquartile Range of the dataset (first quartile is at 10% and thrid quartile starts at 90%)
+# remove outliers from shower_data (<-NA)
 qnt <- quantile(shower_data$energy, probs=c(.10, .90), na.rm = T)
 H <- 1.5 * IQR(shower_data$energy, na.rm = T)
 shower_data$energy[shower_data$energy < (qnt[1] - H)] <- NA
@@ -61,11 +52,16 @@ the estimated values of the DiD model. Do the values reflect what one
 would expect from a successful randomization?
 
 ```{r}
+# define baseline-phase
 baseline <- shower_data %>% filter(Shower < 10)
+# define intervention-phase
 intervention <- shower_data %>% filter(Shower >= 10)
 
+# define treatment- and control-group for baselinephase
 baseline_treatment <- baseline %>% filter(group > 2)
 baseline_control <- baseline %>% filter(group <= 2)
+
+# define treatment- and control-group for interventionphase
 intervention_treatment <- intervention %>% filter(group > 2)
 intervention_control <- intervention %>% filter(group <= 2)
 
@@ -80,6 +76,7 @@ shower_data <- shower_data %>% mutate(intervention = ifelse(Shower < 10, 0, ifel
 # Add dummy variable for treatment group
 shower_data <- shower_data %>% mutate(treatment = ifelse(group <= 2, 0, ifelse(group > 2, 1, NA)))
 
+# create DiD model
 model <- lm(energy ~ Volume + treatment + intervention + treatment * intervention, data = shower_data)
 ```
 
@@ -93,32 +90,51 @@ following variables separately to the basic model
 - Age
 - Long hair (0=no)
 - Environmental attitude (att5: "ich verhalte mich auch dann
-umweltbewusst, wenn es erheblich höhere Kosten und Mühen
+umweltbewusst, wenn es erheblich h?here Kosten und M?hen
 verursacht"; 5 = strong agreement)
 Which variables have a statistically significant influence on the saving
 effects?
 
 ```{r}
+# joined shower_data with survey_data to create new DiD models
 joined_data <- inner_join(shower_data, survey_data, by = "Hh_ID")
+
+# create new variable basline_consumption
 sumVolume <- joined_data %>% filter(intervention == 0) %>% group_by(Hh_ID) %>% summarize(baseline_consumption = sum(Volume))
 joined_data <- inner_join(joined_data, sumVolume, by = "Hh_ID")
 
+# create new DiD model with new variable baseline_consumption
 model1 <- lm(energy ~ Volume + baseline_consumption + treatment + intervention + treatment * intervention, data = joined_data)
+# Akaike Information Criterion gives a value of how good the model fits (lowest value is best fitted model)
+# -21495.9
 AIC(model1)
+
+#create DiD model with variable alter
 model2 <- lm(energy ~ Volume + alter + treatment + intervention + treatment * intervention, data = joined_data)
+# -22161.48
 AIC(model2)
 
+# create dummy variable to tell if the participants has long hair
 joined_data <- joined_data %>% mutate(long_hair = ifelse(X03d_longhair >= 1, "Yes", ifelse(X03d_longhair == 0, "No", NA)))
+# create DiD model with variable long_hair
 model3 <- lm(energy ~ Volume + long_hair + treatment + intervention + treatment * intervention, data = joined_data)
+# -21666.59
 AIC(model3)
 
+#create DiD with variable att5
 model4 <- lm(energy ~ Volume + att5 + treatment + intervention + treatment * intervention, data = joined_data)
+# -21562.88
 AIC(model4)
+
+# The model which fits best is the one with the variable ???alter??? (model2) because it has the lower AIC-value
 ```
 
 ## Exercise e)
 
+Include all the variables from task d) in one single DiD model. Visualize the coefficients in a bar plot that also contains the 90% confidence intervals for each coefficient.
+
 ```{r}
+# applying all variables from Exercise d) to a DiD model
 model5 <- lm(energy ~ Volume + baseline_consumption + alter + long_hair + att5 + treatment + intervention + treatment * intervention, data = joined_data)
 
 barplot(t(summary(model5)$coefficients), main = "Barplot")
@@ -126,23 +142,29 @@ barplot(t(summary(model5)$coefficients), main = "Barplot")
 
 ## Exercise f)
 
+Assume you want to maximize the saving effects of an energy conservation campaign. If you can ask two questions (e.g. using a survey) before starting the campaign, which questions would you ask to determine to whom to give a device? How high would the energy saving effect be if you give devices to 50% of the participants?
+Hint: You may create a DiD only with the participants having favorable characteristics, to compare the energy savings easily with the complete sample of the present study/data set.
+
 ```{r}
-# Treatmentgruppe der nicht Umweltbewussten sparten mehr Wasser
+# To find out which questions are appropriate we checked the already existing answers to question #5 and found out, that participants of the treatment group which answered the question with ???Simme nicht zu??? have a higher water saving so  we pick question #5 as one of our questions to add to the survey before starting the campaign
 test <- joined_data %>% filter(att5 == "Stimme nicht zu")
 model6 <- lm(energy ~ Volume + treatment + intervention + treatment * intervention, data = test)
 
 test2 <- joined_data %>% filter(att5 == "Stimme zu")
 model7 <- lm(energy ~ Volume + treatment + intervention + treatment * intervention, data = test2)
 
+# For the second question we calculated the average showertime, splitted the outcome in two groups, clean_people which need more time to shower and dirty_people which aren't using that much time to shower.
+# Comparing these two groups showed, that people of the treatment-group with a high showertime (clean_people) have a higher saving of energy than people who are used to shorter showertimes
+# Hence, the second question would be: How much time do you spend in the shower while water with an average temperature is running?
 test3 <- joined_data %>% group_by(Hh_ID) %>% summarize(avg_showertime = mean(Showertime))
 test4 <- inner_join(joined_data, test3)
 test5 <- test4 %>% mutate(clean_people = ifelse(avg_showertime >= mean(test3$avg_showertime), 1, ifelse(avg_showertime < mean(test3$avg_showertime), 0, NA)))
 test6 <- test5 %>% filter(clean_people == 1)
 test7 <- test5 %>% filter(clean_people == 0)
 
-# Langeduscher haben in der Intervention phase kürzer geduscht
+# comparing DiD models of clean_people and dirty_people
 model8 <- lm(energy ~ Volume + avg_showertime + treatment + intervention + treatment * intervention, data = test6)
 model9 <- lm(energy ~ Volume + avg_showertime + treatment + intervention + treatment * intervention, data = test7)
 
-# Einzelperson wird signifikanter. Bei Beibehalten der Randomisierung, kaum Unterschied.
+# By cutting the participants down to 50% under the condition, that the randomization is reliable, the energy saving would be the same as before, noting that an individual has more impact on the outcome then before.
 ```
