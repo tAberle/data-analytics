@@ -1,0 +1,54 @@
+---
+title: "assignment_3"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(dplyr)
+require(ggplot2)
+library(caret)
+
+meter_data <- read.csv2("smart_meter_data.csv")
+survey_data <- read.csv2("survey_with_smart_meter_data.csv")
+```
+
+---
+Exercise 1
+---
+```{r setup, include=FALSE}
+joined_data <- inner_join(survey_data, meter_data, by = c("ID" = "V1"))
+View(joined_data)
+
+s <- rowMins(meter_data)
+joined_data <- mutate(joined_data, lowest_consumption = rowMins(meter_data))
+
+joined_data <- mutate(joined_data, mean_consumption = rowMeans(meter_data))
+
+joined_data <- mutate(joined_data, sum_consumption = (rowSums(meter_data) - ID))
+
+View(joined_data)
+
+```
+
+---
+Exercise 2
+---
+```{r setup, include=FALSE}
+
+model <- glm(single ~ lowest_consumption + mean_consumption + sum_consumption, family = binomial, data = joined_data)
+summary(model)
+
+newdf <- joined_data[1:800,]
+testdf <- joined_data[801:1000,]
+model2 <- glm(single ~ lowest_consumption + mean_consumption + sum_consumption, family = binomial, data = newdf)
+
+View(testdf)
+prediction <- predict(model2, type = "response")
+confusionMatrix(data = as.numeric(prediction>0.5), reference = newdf$single)
+
+
+```
+
+---
+Exercise 3
+---
