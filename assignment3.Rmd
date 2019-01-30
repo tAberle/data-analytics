@@ -6,7 +6,6 @@ output: html_document
 ```{r setup, include=FALSE}
 library(dplyr)
 require(ggplot2)
-library(caret)
 library(rpgm)
 
 meter_data <- read.csv2("smart_meter_data.csv")
@@ -31,25 +30,54 @@ joined_data <- mutate(joined_data, mean_consumption = rowMeans(meter_data[, c(2:
 # Cumulated Consumption
 joined_data <- mutate(joined_data, sum_consumption = rowSums(meter_data[, c(2:337)]))
 
-# Night to noon ratio
+# Night to noon ratio 23 - 0 vs 12 - 13
+noon <- c()
+for(i in c(0:1)) {
+  data <- seq(from = 24 + i, to = 337, by = 48)
+  noon <- sort(c(noon, data))
+}
+night <- c()
+for(i in c(0:1)) {
+  data <- seq(from = 46 + i, to = 337, by = 48)
+  night <- sort(c(night, data))
+}
+joined_data <- mutate(joined_data, night_noon_consumption = rowMeans(meter_data[, night]) / rowMeans(meter_data[, noon]))
 
 # Morning Consumption
+morning <- c()
+for(i in c(0:9)) {
+  data <- seq(from = 14 + i, to = 337, by = 48)
+  morning <- sort(c(morning, data))
+}
+joined_data <- mutate(joined_data, morning_consumption = rowMeans(meter_data[, morning]))
 
 # Evening Consumption
+evening <- c()
+for(i in c(0:11)) {
+  data <- seq(from = 36 + i, to = 337, by = 48)
+  evening <- sort(c(evening, data))
+}
+joined_data <- mutate(joined_data, evening_consumption = rowMeans(meter_data[, evening]))
 
 # Weekend Consumption
 
-# Lunch(preparation)time Consumption (11:00 - 13:00)  Sinnvoll?
-lunchtime1 <- seq(from = 22, to = 337, by = 48)
-lunchtime2 <- seq(from = 23, to = 337, by = 48)
-lunchtime3 <- seq(from = 24, to = 337, by = 48)
-lunchtime4 <- seq(from = 25, to = 337, by = 48)
+# Lunch(preparation)time Consumption (12:00 - 14:00)
+lunchtime1 <- seq(from = 24, to = 337, by = 48)
+lunchtime2 <- seq(from = 25, to = 337, by = 48)
+lunchtime3 <- seq(from = 26, to = 337, by = 48)
+lunchtime4 <- seq(from = 27, to = 337, by = 48)
 lunchtime <- sort(c(lunchtime1, lunchtime2, lunchtime3, lunchtime4))
 
 joined_data <- mutate(joined_data, lunchtime_consumption = rowMeans(meter_data[, lunchtime]))
 
-# Dinner(preparation)time Consumption (17:00 - 19:00) Sinnvoll?
+# Dinner(preparation)time Consumption (18:00 - 20:00)
+dinnerime1 <- seq(from = 36, to = 337, by = 48)
+dinnerime2 <- seq(from = 37, to = 337, by = 48)
+dinnerime3 <- seq(from = 38, to = 337, by = 48)
+dinnerime4 <- seq(from = 39, to = 337, by = 48)
+dinnerime <- sort(c(dinnerime1, dinnerime2, dinnerime3, dinnerime4))
 
+joined_data <- mutate(joined_data, dinnerime_consumption = rowMeans(meter_data[, dinnerime]))
 
 ```
 
@@ -67,7 +95,7 @@ training_data <- joined_data[training_indices,]
 test_data <- joined_data[-training_indices,]
 
 # Train the model
-model <- glm(single ~ lowest_consumption + highest_consumption + mean_consumption + sum_consumption + lunchtime_consumption, family = binomial, data = training_data)
+model <- glm(single ~ night_noon_consumption + highest_consumption + mean_consumption + dinnerime_consumption, family = binomial, data = training_data)
 
 prediction <- predict(model, test_data[1,], type = "response")
 confusionMatrix(data = as.numeric(prediction>0.5), reference = test_data$single)
