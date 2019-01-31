@@ -98,14 +98,80 @@ training_data <- joined_data[training_indices,]
 test_data <- joined_data[-training_indices,]
 
 # Train the model
-model <- glm(single ~ night_noon_consumption + highest_consumption + mean_consumption + dinnerime_consumption, family = binomial, data = training_data)
+glm.fit <- glm(single ~ night_noon_consumption + highest_consumption + mean_consumption + dinnerime_consumption + lowest_consumption + lunchtime_consumption, family = binomial, data = training_data)
 
-prediction <- predict(model, test_data[1,], type = "response")
-confusionMatrix(data = as.numeric(prediction>0.5), reference = test_data$single)
+glm.probs <- predict(glm.fit, test_data, type = "response")
+
+# splitting model into single and not-single houshold
+splitted <- ifelse(glm.probs <= 0.5, "Not single","Single")
+confusionmatrix <- table(splitted, test_data$single)
+precious <- (sum(diag(confusionmatrix))/sum(as.vector(confusionmatrix))) #0.865
+
+# five-fold cross validation
+folding <- 5
+joined_data$crossfold <- 1:folding
+fold <- cut(seq(1, nrow(joined_data)), breaks=5, labels = FALSE)
+listen <- list()
+
+
+for(i in 1:folding) {
+  testIndex <- which(joined_data$crossfold==i, arr.ind=TRUE)
+  testData <- joined_data[testIndex, ]
+  trainData <- joined_data[-testIndex, ]
+  model <- glm(single ~ night_noon_consumption + highest_consumption + mean_consumption + dinnerime_consumption + lowest_consumption + lunchtime_consumption, family = binomial, data = training_data)
+  
+  listen[[i]]$model <- model
+  prediction <- predict(model, testData, type ="response")
+  prediction <- ifelse(prediction <= 0.5, "Not single","Single")
+  listen[[i]]$confusionmatrix <- table(prediction, testData$single)
+  
+  listen[[i]]$accuracy <- (sum(diag(listen[[i]]$confusionmatrix))/sum(as.vector(listen[[i]]$confusionmatrix)))
+}
+
+
+# average of accuracy
+vector <- c()
+for(i in 1:folding) {
+  vector <- c(vector,listen[[i]]$accuracy)
+}
+av_accuracy <- mean(vector)
+standartdeviation <- sd(vector)
+
+error <- qt(0.975, folding-1)*standartdeviation/sqrt(folding)
+
+barplot <- ggplot(as.data.frame(av_accuracy), aes(x=1, y=av_accuracy)) + geom_bar(position = position_dodge(), stat = "identity") + geom_errorbar(aes(ymin = av_accuracy - error, ymax = av_accuracy + error), width = 0.5)
+
+
+
+# guessing and biased guessing visualised by barplot
+set.seed(8790)
+random_counter <- 0
+biased_counter <- 0
+
+for(i in 1:nrow(joined_data)) {
+  class <- joined_data[i, "single"]
+  flips <- sample(c("Single", "Not single"), size = 1, replace = TRUE, prob = c(0.5, 0.5))
+  if(class == flips) {
+    random_counter <- random_counter + 1
+  }
+}
+
+random_ac <- random_counter / nrow(joined_data)
+single_counter <- nrow(joined_data %>% filter(single == "Single"))
+
+
+for(i in 1:nrow(joined_data)) {
+  class <- joined_data[i, "single"]
+  flips <- sample(c("Single", "Not single"), size = 1, replace = TRUE, prob = c(1-single_counter/ nrow(joined_data), single_counter/ nrow(joined_data)))
+  if(class == flips) {
+    biased_counter <- biased_counter + 1
+  }
+}
+
+biased_ac <- biased_counter / nrow(joined_data)
+
+barplot <- ggplot(data.frame(accuracies = c("model accuracy", "random guess", "biased guess"), accuracies_value = c(av_accuracy, random_ac, biased_ac)), aes(x=accuracies, y=accuracies_value)) + geom_bar(stat="identity") + geom_bar(position = position_dodge(), stat = "identity") + geom_errorbar(aes(ymin = av_accuracy - error, ymax = av_accuracy + error), width = 0.5)
+
 
 
 ```
-
----
-Exercise 3
----
