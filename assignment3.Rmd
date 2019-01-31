@@ -18,6 +18,9 @@ Exercise 1
 ```{r setup, include=FALSE}
 joined_data <- inner_join(survey_data, meter_data, by = c("ID" = "V1"))
 
+# find null values
+sapply(joined_data,function(x) sum(is.na(x)))
+
 # Lowest Consumption
 joined_data <- mutate(joined_data, lowest_consumption = rowMins(meter_data[, c(2:337)]))
 
@@ -62,22 +65,22 @@ joined_data <- mutate(joined_data, evening_consumption = rowMeans(meter_data[, e
 # Weekend Consumption
 
 # Lunch(preparation)time Consumption (12:00 - 14:00)
-lunchtime1 <- seq(from = 24, to = 337, by = 48)
-lunchtime2 <- seq(from = 25, to = 337, by = 48)
-lunchtime3 <- seq(from = 26, to = 337, by = 48)
-lunchtime4 <- seq(from = 27, to = 337, by = 48)
-lunchtime <- sort(c(lunchtime1, lunchtime2, lunchtime3, lunchtime4))
+lunchtime <- c()
+for(i in c(0:3)) {
+  data <- seq(from = 24 + i, to = 337, by = 48)
+  lunchtime <- sort(c(lunchtime, data))
+}
 
 joined_data <- mutate(joined_data, lunchtime_consumption = rowMeans(meter_data[, lunchtime]))
 
 # Dinner(preparation)time Consumption (18:00 - 20:00)
-dinnerime1 <- seq(from = 36, to = 337, by = 48)
-dinnerime2 <- seq(from = 37, to = 337, by = 48)
-dinnerime3 <- seq(from = 38, to = 337, by = 48)
-dinnerime4 <- seq(from = 39, to = 337, by = 48)
-dinnerime <- sort(c(dinnerime1, dinnerime2, dinnerime3, dinnerime4))
+dinnertime <- c()
+for(i in c(0:3)) {
+  data <- seq(from = 36 + i, to = 337, by = 48)
+  dinnertime <- sort(c(dinnertime, data))
+}
 
-joined_data <- mutate(joined_data, dinnerime_consumption = rowMeans(meter_data[, dinnerime]))
+joined_data <- mutate(joined_data, dinnerime_consumption = rowMeans(meter_data[, dinnertime]))
 
 ```
 
