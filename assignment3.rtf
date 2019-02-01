@@ -1,22 +1,60 @@
 {\rtf1\ansi\ansicpg1252\cocoartf1671
-{\fonttbl\f0\fswiss\fcharset0 ArialMT;}
-{\colortbl;\red255\green255\blue255;\red255\green255\blue255;\red0\green0\blue0;}
-{\*\expandedcolortbl;;\cssrgb\c100000\c100000\c100000;\cssrgb\c0\c0\c0;}
-{\*\listtable{\list\listtemplateid1\listhybrid{\listlevel\levelnfc23\levelnfcn23\leveljc0\leveljcn0\levelfollow0\levelstartat1\levelspace360\levelindent0{\*\levelmarker \{disc\}}{\leveltext\leveltemplateid1\'01\uc0\u8226 ;}{\levelnumbers;}\fi-360\li720\lin720 }{\listname ;}\listid1}}
+{\fonttbl\f0\fnil\fcharset0 HelveticaNeue;\f1\fnil\fcharset0 HelveticaNeue-Bold;}
+{\colortbl;\red255\green255\blue255;\red0\green0\blue0;}
+{\*\expandedcolortbl;;\cssrgb\c0\c0\c0;}
+{\*\listtable{\list\listtemplateid1\listhybrid{\listlevel\levelnfc0\levelnfcn0\leveljc0\leveljcn0\levelfollow0\levelstartat1\levelspace360\levelindent0{\*\levelmarker \{decimal\}.}{\leveltext\leveltemplateid1\'02\'00.;}{\levelnumbers\'01;}\fi-360\li720\lin720 }{\listlevel\levelnfc0\levelnfcn0\leveljc0\leveljcn0\levelfollow0\levelstartat1\levelspace360\levelindent0{\*\levelmarker \{decimal\}.}{\leveltext\leveltemplateid2\'02\'01.;}{\levelnumbers\'01;}\fi-360\li1440\lin1440 }{\listname ;}\listid1}}
 {\*\listoverridetable{\listoverride\listid1\listoverridecount0\ls1}}
-\paperw11900\paperh16840\margl1440\margr1440\vieww10800\viewh8400\viewkind0
+\paperw11900\paperh16840\margl1440\margr1440\vieww13980\viewh10720\viewkind0
 \deftab720
-\pard\tx220\tx720\pardeftab720\li720\fi-720\partightenfactor0
-\ls1\ilvl0
-\f0\fs30 \cf0 \cb2 Management Summary (Aberle, Kleinhenz)\
-{\listtext	\uc0\u8226 	}\expnd0\expndtw0\kerning0
-Worum geht es?\cb1 \
-\pard\tx220\tx720\pardeftab720\li720\fi-720\partightenfactor0
-\ls1\ilvl0\cf0 \cb2 \kerning1\expnd0\expndtw0 {\listtext	\uc0\u8226 	}\expnd0\expndtw0\kerning0
-Welche Entscheidung ist zu treffen?\cb1 \
-\ls1\ilvl0\cb2 \kerning1\expnd0\expndtw0 {\listtext	\uc0\u8226 	}\expnd0\expndtw0\kerning0
-Welche Optionen gibt es?\cb1 \
-\ls1\ilvl0\cb2 \kerning1\expnd0\expndtw0 {\listtext	\uc0\u8226 	}\expnd0\expndtw0\kerning0
-Nach welchen Kriterien wurden diese Optionen beurteilt?\cb1 \
-\ls1\ilvl0\cb2 \kerning1\expnd0\expndtw0 {\listtext	\uc0\u8226 	}\expnd0\expndtw0\kerning0
-Welche dieser Optionen wird empfohlen?}
+\pard\pardeftab720\partightenfactor0
+
+\f0\fs22 \cf2 \expnd0\expndtw0\kerning0
+Management Summary (Aberle, Kleinhenz)\
+\
+\pard\pardeftab720\partightenfactor0
+
+\f1\b \cf2 \ul \ulc2 Introduction\
+\
+\pard\pardeftab720\partightenfactor0
+
+\f0\b0 \cf2 \ulnone The management summary is about the third assignment of the course Data Analytics. Participants of the following assignment are Esther Kleinhenz and Thomas Aberle. The Kick-Off happened at the 23th of January and was finished with finalising the management summary at the first of February. \
+The assignment was done to practice procedures by using classifiers and proof that training a dataset can value different informations in an appropriate way. \
+\
+The following short overview shows how the assignment was compiled:\
+\pard\tx360\tx720\pardeftab720\li720\fi-720\partightenfactor0
+\ls1\ilvl1\cf2 \kerning1\expnd0\expndtw0 {\listtext	1.	}\expnd0\expndtw0\kerning0
+First steps to understand the dataset and join it to one common dataset\
+\ls1\ilvl1\kerning1\expnd0\expndtw0 {\listtext	2.	}\expnd0\expndtw0\kerning0
+Create some features to get to know the needed procedure\
+\ls1\ilvl1\kerning1\expnd0\expndtw0 {\listtext	3.	}\expnd0\expndtw0\kerning0
+Split data into test and training set\
+\ls1\ilvl1\kerning1\expnd0\expndtw0 {\listtext	4.	}\expnd0\expndtw0\kerning0
+Segmenting the data into single and non-single households and completing the five-fold cross validation\
+\ls1\ilvl1\kerning1\expnd0\expndtw0 {\listtext	5.	}\expnd0\expndtw0\kerning0
+Calculating the average of accuracy\
+\ls1\ilvl1\kerning1\expnd0\expndtw0 {\listtext	6.	}\expnd0\expndtw0\kerning0
+Creating a guess and a biased guess\
+\ls1\ilvl1\kerning1\expnd0\expndtw0 {\listtext	7.	}\expnd0\expndtw0\kerning0
+Putting all the result into one barplot\
+\pard\pardeftab720\partightenfactor0
+\cf2 \
+\
+\pard\pardeftab720\partightenfactor0
+
+\f1\b \cf2 \ul Course of action\
+\
+\pard\pardeftab720\partightenfactor0
+
+\f0\b0 \cf2 \ulnone The features were choosen by some suggestions found in the slides fo the lecture (Feature Selection). Features like highes consumption, lowest consumption, mean consumption, cumulated consumption, night to noon ration, morning consumption, evening consumption, lunch consumption and dinner consumption.\
+\
+Training and test set were put into relation, as recommended in the lecture (80% to 20%) and were randomly ordered by \'93setting a seed\'93.\
+\
+To train a model, glm.fit was used to keep it as simple as possible and all the features were put into the regression model.\
+\
+Calculating the accuracy of the guessed values showed an appropriate probability, so the five-fold cross validation was performed. In-between the different lists and matrixes were printed and determined as reasonable.\
+\
+The accuracies were put into a vector to calculate the average accuracy and the standard deviation to compute the occurring error. A barplot was generated to visualise the current status.\
+\
+Biased and random guess are realised with a counter and loops which are iterating through the \'93single\'93 row and taking samples. After compiling these guesses the average accuracy can be calculated and the output was issued and rated as appropriate.\
+\
+The interpretations are added to the code as comments.}
