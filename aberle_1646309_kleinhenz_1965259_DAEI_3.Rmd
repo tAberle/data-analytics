@@ -1,0 +1,216 @@
+---
+title: "assignment_3"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(dplyr)
+require(ggplot2)
+library(rpgm)
+
+meter_data <- read.csv2("smart_meter_data.csv")
+survey_data <- read.csv2("survey_with_smart_meter_data.csv")
+```
+
+---
+## Exercise 1
+---
+```{r setup, include=FALSE}
+joined_data <- inner_join(survey_data, meter_data, by = c("ID" = "V1"))
+
+# Lowest Consumption
+joined_data <- mutate(joined_data, lowest_consumption = rowMins(meter_data[, c(2:337)]))
+
+# Highest Consumption
+joined_data <- mutate(joined_data, highest_consumption = rowMaxs(meter_data[, c(2:337)]))
+
+# Mean Consumption
+joined_data <- mutate(joined_data, mean_consumption = rowMeans(meter_data[, c(2:337)]))
+
+# Cumulated Consumption
+joined_data <- mutate(joined_data, sum_consumption = rowSums(meter_data[, c(2:337)]))
+
+# Night to noon ratio 23 - 0 vs 12 - 13
+noon <- c()
+for(i in c(0:1)) {
+  data <- seq(from = 24 + i, to = 337, by = 48)
+  noon <- sort(c(noon, data))
+}
+night <- c()
+for(i in c(0:1)) {
+  data <- seq(from = 46 + i, to = 337, by = 48)
+  night <- sort(c(night, data))
+}
+joined_data <- mutate(joined_data, night_noon_consumption = rowMeans(meter_data[, night]) / rowMeans(meter_data[, noon]))
+
+# Morning Consumption
+morning <- c()
+for(i in c(0:9)) {
+  data <- seq(from = 14 + i, to = 337, by = 48)
+  morning <- sort(c(morning, data))
+}
+joined_data <- mutate(joined_data, morning_consumption = rowMeans(meter_data[, morning]))
+
+# Afternoon Consumption
+afternoon <- c()
+for(i in c(0:11)) {
+  data <- seq(from = 24 + i, to = 337, by = 48)
+  afternoon <- sort(c(afternoon, data))
+}
+joined_data <- mutate(joined_data, afternoon_consumption = rowMeans(meter_data[, afternoon]))
+
+# Evening Consumption
+evening <- c()
+for(i in c(0:11)) {
+  data <- seq(from = 36 + i, to = 337, by = 48)
+  evening <- sort(c(evening, data))
+}
+joined_data <- mutate(joined_data, evening_consumption = rowMeans(meter_data[, evening]))
+
+# Weekday consumption
+joined_data <- mutate(joined_data, weekday_consumption = rowMeans(meter_data[, c(1:240)]))
+
+# Weekend Consumption
+joined_data <- mutate(joined_data, weekend_consumption = rowMeans(meter_data[, c(241:337)]))
+
+# Lunch(preparation)time Consumption (12:00 - 14:00)
+lunchtime <- c()
+for(i in c(0:3)) {
+  data <- seq(from = 24 + i, to = 337, by = 48)
+  lunchtime <- sort(c(lunchtime, data))
+}
+
+joined_data <- mutate(joined_data, lunchtime_consumption = rowMeans(meter_data[, lunchtime]))
+
+# Dinner(preparation)time Consumption (18:00 - 20:00)
+dinnertime <- c()
+for(i in c(0:3)) {
+  data <- seq(from = 36 + i, to = 337, by = 48)
+  dinnertime <- sort(c(dinnertime, data))
+}
+
+joined_data <- mutate(joined_data, dinnertime_consumption = rowMeans(meter_data[, dinnertime]))
+
+# Dinner to Lunch Ratio
+joined_data <- mutate(joined_data, dinner_to_lunch_ratio = lunchtime_consumption / dinnertime_consumption)
+
+# Min to Max Ratio
+joined_data <- mutate(joined_data, min_to_max_ratio = lowest_consumption / highest_consumption)
+
+# Morning to Evening Ratio
+joined_data <- mutate(joined_data, morning_to_evening_ratio = morning_consumption / evening_consumption)
+
+```
+
+---
+## Exercise 2
+---
+```{r setup, include=FALSE}
+# Split data set randomly into training set and test set
+training_data_size <- floor(0.8 * nrow(joined_data))
+
+set.seed(4815)
+
+training_indices <- sample(seq_len(nrow(joined_data)), size = training_data_size)
+training_data <- joined_data[training_indices,]
+test_data <- joined_data[-training_indices,]
+
+# Train the model
+glm.fit <- glm(single ~ night_noon_consumption + highest_consumption + mean_consumption + sum_consumption + dinnertime_consumption + lowest_consumption + lunchtime_consumption + morning_consumption + afternoon_consumption + evening_consumption + weekday_consumption + weekend_consumption + dinner_to_lunch_ratio + min_to_max_ratio + morning_to_evening_ratio, family = binomial, data = training_data)
+summary(glm.fit)
+
+```
+Interpretation of the logistc regression model:
+The summary of our model shows, that the mean consumption and the consumption in the evening are the most significant independent variables, followed by the lowest consumption the min-to-max ratio and the consumptions in the morning and afternoon. The higher the mean consumption, the higher is the chance, that a household isn't a single household. The same goes for the ratio between the minimal and the maximal consumption. This may be due to the fact, that in a non single household the max consumption tends to be higher, but since single and non single households both have periods where the consumptions are low (e.g. night times) the ratio tends to be bigger in non single households.
+The feature sum_consumption seems to have no significance at all
+
+```{r}
+glm.probs <- predict(glm.fit, test_data, type = "response")
+
+# splitting model into single and not-single houshold
+splitted <- ifelse(glm.probs <= 0.5, "Not single","Single")
+confusionmatrix <- table(splitted, test_data$single)
+accuracy <- (sum(diag(confusionmatrix))/sum(as.vector(confusionmatrix)))
+confusionmatrix
+accuracy
+```
+### Interpretation of the classification:
+The accuracy is around 0.84, so 84% of all households could be classified correctly. This values sounds quite good, but the accuracy alone is not a very suitable measure in this case. Since 180 of the 200 data points in our test data set are household labeled as "non single", a classifier that simply always outputs "non single" would achieve an accuracy of 90%. To get a better understanding of the quality of our model, further quality measures like Precision, Recall or an ROC-Curve are recommended.
+
+```{r}
+# five-fold cross validation
+folding <- 5
+joined_data$crossfold <- 1:folding
+fold <- cut(seq(1, nrow(joined_data)), breaks=5, labels = FALSE)
+lists <- list()
+
+
+for(i in 1:folding) {
+  testIndex <- which(joined_data$crossfold==i, arr.ind=TRUE)
+  testData <- joined_data[testIndex, ]
+  trainData <- joined_data[-testIndex, ]
+  
+  model <- glm(single ~ night_noon_consumption + highest_consumption + mean_consumption + sum_consumption + dinnertime_consumption + lowest_consumption + lunchtime_consumption + morning_consumption + afternoon_consumption + evening_consumption + weekday_consumption + weekend_consumption + dinner_to_lunch_ratio + min_to_max_ratio + morning_to_evening_ratio, family = binomial, data = training_data)
+  
+  lists[[i]] <- list()
+  lists[[i]]$model <- model
+  prediction <- predict(model, testData, type ="response")
+  prediction <- ifelse(prediction <= 0.5, "Not single","Single")
+  lists[[i]]$confusionmatrix <- table(prediction, testData$single)
+  
+  lists[[i]]$accuracy <- sum(diag(lists[[i]]$confusionmatrix))/sum(as.vector(lists[[i]]$confusionmatrix))
+}
+
+# average of accuracy
+vector <- c()
+for(i in 1:folding) {
+  vector <- c(vector,lists[[i]]$accuracy)
+}
+av_accuracy <- mean(vector)
+standarddeviation <- sd(vector)
+
+error <- qt(0.975, folding-1)*standarddeviation/sqrt(folding)
+
+barplot <- ggplot(as.data.frame(av_accuracy), aes(x=1, y=av_accuracy)) + geom_bar(position = position_dodge(), stat = "identity") + geom_errorbar(aes(ymin = av_accuracy - error, ymax = av_accuracy + error), width = 0.5)
+
+
+
+# guessing and biased guessing visualised by barplot
+set.seed(162342)
+random_counter <- 0
+biased_counter <- 0
+
+for(i in 1:nrow(joined_data)) {
+  class <- joined_data[i, "single"]
+  flips <- sample(c("Single", "Not single"), size = 1, replace = TRUE, prob = c(0.5, 0.5))
+  if(class == flips) {
+    random_counter <- random_counter + 1
+  }
+}
+
+random_ac <- random_counter / nrow(joined_data)
+single_counter <- nrow(joined_data %>% filter(single == "Single"))
+
+set.seed(108)
+for(i in 1:nrow(joined_data)) {
+  class <- joined_data[i, "single"]
+  flips <- sample(c("Single", "Not single"), size = 1, replace = TRUE, prob = c(single_counter/ nrow(joined_data), 1-single_counter/ nrow(joined_data)))
+  if(class == flips) {
+    biased_counter <- biased_counter + 1
+  }
+}
+
+biased_ac <- biased_counter / nrow(joined_data)
+
+barplot <- ggplot(data.frame(accuracies = c("model accuracy", "random guess", "biased guess"), accuracies_value = c(av_accuracy, random_ac, biased_ac)), aes(x=accuracies, y=accuracies_value)) + geom_bar(stat="identity") + geom_bar(position = position_dodge(), stat = "identity") + geom_errorbar(aes(ymin = av_accuracy - error, ymax = av_accuracy + error), width = 0.5)
+barplot
+
+```
+### Are the accuracies of the random and biased guess in the range of the confidence interval from the cross validation?
+No, not even close.
+### What can we infer from that:
+That our trained model outperforms random and bias guesses.
+
+### How can the classification be improved:
+- Instead of using many, in our case often not that useful, features one could narrow the selection by choosing the features, that show the highest correlation with the target class. An insight into the correlations could be get by plotting the correlationmatrix of all features or a scatterplot.
+- A more powerful machine learning technique, like a Support Vector Machine or a Random Forrest Classifier.
